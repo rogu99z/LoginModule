@@ -1,7 +1,7 @@
 # Login Module
 
-##### This is a basic login module with a small amount of data to consider 
-#####  as a starting point for any application that requires it
+ This is a basic login module with a small amount of data to consider
+  as a starting point for any application that requires it
 
 ---
 
@@ -19,7 +19,7 @@
 
 ##Usage
 
-  #####You can browse the basic funcionalities, starting with user creation (create.php), 
-  #####  following with login (login.php), and finally can logout, create another user, change password or delete him.
+  You can browse the basic funcionalities, starting with user creation (create.php), 
+   following with login (login.php), and finally can logout, create another user, change password or delete him.
 
   ---
