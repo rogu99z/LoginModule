@@ -7,6 +7,7 @@
 		public $logged_in = false;
 		public $userdata;
 
+
 		public function __construct(){
 			$sessionId = session_id();
 
@@ -14,32 +15,58 @@
 				throw new Exception("No session existence.");
 			}
 
-			$this->connection = new mysqli($GLOBALS["hostname"], $GLOBALS["username"], $GLOBALS["password"], $GLOBALS["database"]);
+			$host = $GLOBALS["hostname"];
+			$database = $GLOBALS["database"];
+			$user = $GLOBALS["username"];
+			$password = $GLOBALS["password"];
 
-			if( $this->connection->connect_error )
-				throw new Exception("MySQL connection error ".$this->connection->connect_error);
+			try {
+				$this->connection = new PDO("mysql:host=$host;dbname=$database", $user, $password, array(PDO::MYSQL_ATTR_FOUND_ROWS => true));
+				$this->_isValidUser();
+				$this->_updateMostRecentActivity();
+			}
+			catch (PDOException $e) {
+			    throw new Exception("MySQL connection error " . $e->getMessage());
+			}
+		}
 
-			$this->_isValidUser();
-			$this->_updateMostRecentActivity();
+		private function executeQuery($query){
+			$preparedStatement = $this->connection->prepare("INSERT INTO REGISTRY (name, value) VALUES (:name, :value)");
+			$sentencia->bindParam(':name', $nombre);
+			$sentencia->bindParam(':value', $valor);
 		}
 
 		public function create($username, $password){
-			$sql = "INSERT INTO users (username, password, mostRecentActivity, creationTime) VALUES ('$username', '$password', NOW(), NOW())";
-			return $this->connection->query($sql);
+			try {
+				$preparedStatement = $this->connection->prepare("INSERT INTO users (username, password, mostRecentActivity, creationTime) VALUES (:username, :password, NOW(), NOW())");
+				$preparedStatement->bindParam(":username", $username, PDO::PARAM_STR);
+				$preparedStatement->bindParam(":password", $password, PDO::PARAM_STR);
+				$preparedStatement->execute();
+				return $preparedStatement->rowCount();
+
+			}catch (PDOException $e) {
+			    throw new Exception("MySQL connection error " . $e->getMessage());
+			}
 		}
 
 		public function login($username, $password){
-			$sql = "SELECT id FROM users WHERE username='$username' AND password='$password' LIMIT 1";
-			$result = $this->connection->query($sql);
+			try {
 
-			if($result->num_rows > 0){
-				$id = $result->fetch_row()[0];
-				$_SESSION[$this->session]["id"] = $id;
-				$this->logged_in = true;
-				return $id;
+				$preparedStatement = $this->connection->prepare("SELECT id FROM users WHERE username=:username AND password=:password LIMIT 1");
+				$preparedStatement->bindParam(":username", $username, PDO::PARAM_STR);
+				$preparedStatement->bindParam(":password", $password, PDO::PARAM_STR);
+				$preparedStatement->execute();
+				$result = $preparedStatement->fetchAll();
+				if(sizeof($result) == 1){
+					$id = $result[0]["id"];
+					$_SESSION[$this->session]["id"] = $id;
+					$this->logged_in = true;
+					return $id;
+				}
+
+			}catch (PDOException $e) {
+			    throw new Exception("MySQL connection error " . $e->getMessage());
 			}
-
-			return false;
 		}
 
 		public function logout(){
@@ -60,17 +87,17 @@
 			$sql = "SELECT DISTINCT id, username, mostRecentActivity, creationTime FROM users ORDER BY username ASC";
 			$result = $this->connection->query($sql);
 			
-			if( $result->num_rows == 0)
+			if( $result->rowCount() == 0)
 				return array();
 
 			$users = array();
 			$i = 0;
 
-			while($row = $result->fetch_row()){		
-				$users[$i]["id"] = $row[0];
-				$users[$i]["username"] = $row[1];
-				$users[$i]["mostRecentActivity"] = $row[2];
-				$users[$i]["creationTime"] = $row[3];
+			while($row = $result->fetch(PDO::FETCH_ASSOC)){
+				$users[$i]["id"] = $row["id"];
+				$users[$i]["username"] = $row["username"];
+				$users[$i]["mostRecentActivity"] = $row["mostRecentActivity"];
+				$users[$i]["creationTime"] = $row["creationTime"];
 				$i++;
 			}
 
@@ -85,11 +112,11 @@
 
 			$sql = "SELECT id, username, mostRecentActivity, creationTime FROM users WHERE id='$id' LIMIT 1";
 			$result = $this->connection->query($sql);
-			$row = $result->fetch_row();
-			$user["id"] = $row[0];
-			$user["username"] = $row[1];
-			$user["mostRecentActivity"] = $row[2];
-			$user["creationTime"] = $row[3];
+			$row = $result->fetch(PDO::FETCH_ASSOC);
+			$user["id"] = $row["id"];
+			$user["username"] = $row["username"];
+			$user["mostRecentActivity"] = $row["mostRecentActivity"];
+			$user["creationTime"] = $row["creationTime"];
 			return $user;
 		}
 
@@ -107,8 +134,8 @@
 
 			$id = $_SESSION[$this->session]["id"];
 			$sql = "UPDATE users SET mostRecentActivity=NOW() WHERE id='$id' LIMIT 1";
-			$this->connection->query($sql);
-			$affected = $this->connection->affected_rows;
+			$result = $this->connection->query($sql);
+			$affected = $result->rowCount();
 
 			if ($affected>1){
 				throw new Exception("Exception updating last login ".$this->connection->error);
@@ -124,15 +151,20 @@
 			}
 
 			$id = $_SESSION[$this->session]["id"];
-			$sql = "SELECT id FROM users WHERE id='$id' LIMIT 1";
-			$result = $this->connection->query($sql);
 
-			if($result->num_rows != 1){
-				$this->logout();
-				return;
+			try{
+				$sql = "SELECT id FROM users WHERE id='$id' LIMIT 1";
+				$result = $this->connection->query($sql);
+
+				if($result->rowCount() != 1){
+					$this->logout();
+					return;
+				}
+
+				$this->logged_in = true;
+			}catch (PDOException $e) {
+			    throw new Exception("MySQL connection error " . $e->getMessage());
 			}
-
-			$this->logged_in = true;
 		}		
 	}
 	
