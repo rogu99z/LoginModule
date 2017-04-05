@@ -29,13 +29,7 @@
 			    throw new Exception("MySQL connection error " . $e->getMessage());
 			}
 		}
-
-		private function executeQuery($query){
-			$preparedStatement = $this->connection->prepare("INSERT INTO REGISTRY (name, value) VALUES (:name, :value)");
-			$sentencia->bindParam(':name', $nombre);
-			$sentencia->bindParam(':value', $valor);
-		}
-
+ 	
 		public function create($username, $password){
 			try {
 				$preparedStatement = $this->connection->prepare("INSERT INTO users (username, password, mostRecentActivity, creationTime) VALUES (:username, :password, NOW(), NOW())");
@@ -79,8 +73,11 @@
 		}
 
 		public function setPassword($password, $id){
-			$sql = "UPDATE users SET password='$password' WHERE id='$id' LIMIT 1";
-			return $this->connection->query($sql);
+			$preparedStatement = $this->connection->prepare("UPDATE users SET password=:password WHERE id=:id LIMIT 1");
+			$preparedStatement->bindParam(":password", $password, PDO::PARAM_INT);
+			$preparedStatement->bindParam(":id", $id, PDO::PARAM_INT);
+			$preparedStatement->execute();
+			return $preparedStatement->fetch(PDO::FETCH_ASSOC);
 		}
 
 		public function getUsers(){
@@ -110,19 +107,21 @@
 				$id = $_SESSION[$this->session]["id"];
 			}
 
-			$sql = "SELECT id, username, mostRecentActivity, creationTime FROM users WHERE id='$id' LIMIT 1";
-			$result = $this->connection->query($sql);
-			$row = $result->fetch(PDO::FETCH_ASSOC);
-			$user["id"] = $row["id"];
-			$user["username"] = $row["username"];
-			$user["mostRecentActivity"] = $row["mostRecentActivity"];
-			$user["creationTime"] = $row["creationTime"];
+			$preparedStatement = $this->connection->prepare("SELECT id, username, mostRecentActivity, creationTime FROM users WHERE id=:id LIMIT 1");
+			$preparedStatement->bindParam(":id", $id, PDO::PARAM_INT);
+			$preparedStatement->execute();
+			$result = $preparedStatement->fetch(PDO::FETCH_ASSOC);
+			$user["id"] = $result["id"];
+			$user["username"] = $result["username"];
+			$user["mostRecentActivity"] = $result["mostRecentActivity"];
+			$user["creationTime"] = $result["creationTime"];
 			return $user;
 		}
 
 		public function delete($id){
-			$sql = "DELETE FROM users WHERE id='$id'";
-			$this->connection->query($sql);
+			$preparedStatement = $this->connection->prepare("DELETE FROM users WHERE id=:id");
+			$preparedStatement->bindParam(":id", $id, PDO::PARAM_INT);
+			$preparedStatement->execute();
 			return;
 		}
 
@@ -133,8 +132,10 @@
 			}
 
 			$id = $_SESSION[$this->session]["id"];
-			$sql = "UPDATE users SET mostRecentActivity=NOW() WHERE id='$id' LIMIT 1";
-			$result = $this->connection->query($sql);
+			$preparedStatement = $this->connection->prepare("UPDATE users SET mostRecentActivity=NOW() WHERE id=:id LIMIT 1");
+			$preparedStatement->bindParam(":id", $id, PDO::PARAM_INT);
+			$preparedStatement->execute();
+			$result = $preparedStatement->fetch(PDO::FETCH_ASSOC);
 			$affected = $result->rowCount();
 
 			if ($affected>1){
@@ -153,8 +154,10 @@
 			$id = $_SESSION[$this->session]["id"];
 
 			try{
-				$sql = "SELECT id FROM users WHERE id='$id' LIMIT 1";
-				$result = $this->connection->query($sql);
+				$preparedStatement = $this->connection->prepare("SELECT id FROM users WHERE id=:id LIMIT 1");
+				$preparedStatement->bindParam(":id", $id, PDO::PARAM_INT);
+				$preparedStatement->execute();
+				$result = $preparedStatement->fetch(PDO::FETCH_ASSOC);
 
 				if($result->rowCount() != 1){
 					$this->logout();
